@@ -7,6 +7,8 @@ and open only to users with the **Dashboard Viewer** role.
 
 See [docs/architecture.md](docs/architecture.md) for how access, data and IAM
 registration work.
+[docs/deployment.md](docs/deployment.md) covers the Helm chart, CI/CD and the
+first deployment to an environment.
 
 ## Run
 
@@ -58,3 +60,5 @@ npm run build
 | `server/data/` | chart catalog, `ChartSource` and the cache |
 | `server/auth/session.ts`, `proxy.ts` | session and role check |
 | `iam/` | IAM catalog and registration script |
+| `server/geo-catalog.ts`, `data/`, `scripts/build-geo-catalog.mjs` | location catalog behind the filters |
+| `helm/`, `Jenkinsfile`, `.github/workflows/` | chart, CI/CD |

@@ -1,0 +1,69 @@
+{{- /*
+Registers the dashboard with the registry's IAM after every install and
+upgrade: the staff-portal tile, the dashboard:view permission and the
+"Dashboard Viewer" role (iam/payload.json, run by iam/register.mjs from the
+dashboard image). Idempotent. It authenticates as the Keycloak client
+access.clientId (client credentials), whose secret comes from an existing
+Secret; the client and its role are environment setup (docs/deployment.md).
+*/ -}}
+{{- if .Values.iamRegister.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "dashboard.fullname" . }}-iam-register
+  labels:
+    {{- include "dashboard.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Chart.Name }}-iam-register
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      serviceAccountName: {{ include "dashboard.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      {{- include "dashboard.imagePullSecrets" . | nindent 6 }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: iam-register
+          image: {{ include "dashboard.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["node", "iam/register.mjs"]
+          env:
+            - name: IAM_REGISTER_URL
+              value: {{ .Values.iamRegister.iamUrl | default .Values.iam.url | required "iam.url is required" | quote }}
+            - name: TOKEN_URL
+              value: {{ include "dashboard.tokenUrl" . | quote }}
+            - name: DASHBOARD_CLIENT_ID
+              value: {{ .Values.access.clientId | quote }}
+            - name: DASHBOARD_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "dashboard.clientSecretName" . }}
+                  key: {{ .Values.iamRegister.clientSecret.key }}
+            - name: PUBLIC_URL
+              value: {{ required "publicUrl is required" .Values.publicUrl | quote }}
+            - name: APP_DESCRIPTION
+              value: {{ .Values.iamRegister.description | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+{{- end }}

@@ -1,0 +1,132 @@
+# Livestock registry dashboard. See docs/deployment.md.
+
+image:
+  repository: ""   # e.g. <account>.dkr.ecr.ap-south-1.amazonaws.com/openg2p/livestock-registry-dashboard
+  tag: ""          # set by CI: the commit sha (12)
+  pullPolicy: IfNotPresent
+
+# ECR pull secret, created and refreshed by the release (a pre-install/
+# pre-upgrade hook Job, then a CronJob), so the namespace needs no setup and
+# its default ServiceAccount is left alone. The token comes from the node's
+# IAM role.
+ecrPullSecret:
+  enabled: true
+  name: livestock-registry-dashboard-ecr
+  registry: ""           # default: the host part of image.repository
+  schedule: "0 */8 * * *"
+  awsCliImage: amazon/aws-cli:2.36.43
+  kubectlImage: alpine/k8s:1.31.1
+
+# Further pull secrets for the image, as [{name: ...}].
+imagePullSecrets: []
+
+replicas: 1
+
+# Public origin of the dashboard (https://<host>). It is the only host the
+# dashboard serves: requests for any other host are redirected here, and login
+# returns here. It must sit under iam.cookieDomain, or the browser never sends
+# the IAM session cookies to it.
+publicUrl: ""
+
+# The registry's dashboard-api (cluster-internal); the only part that reads
+# the registry database.
+dashboardApiUrl: http://livestock-registry-dashboard-api
+
+# Seconds chart rows are served before a background refresh (min 60).
+cacheTtlSeconds: 900
+
+iam:
+  # The registry's IAM (staff portal API). Only the dashboard server calls it
+  # (login start, session check, logout), so a cluster-internal URL works.
+  url: http://commons-services-iam-staff-portal-api
+  loginProviderId: "1"
+  # Domain IAM scopes its session cookies to (its AUTH_COOKIE_DOMAIN). Logout
+  # clears them there when IAM cannot end the session itself.
+  cookieDomain: ""
+
+# Keycloak's end-session endpoint (browser-facing) and IAM's client id. Used
+# to end the Keycloak session when IAM cannot (expired session). Empty skips
+# it: the cookies are still cleared.
+oidc:
+  logoutUrl: ""
+  clientId: ""
+
+# Who may open the dashboard: users holding this client role on this Keycloak
+# client. The same role enables the staff-portal tile.
+access:
+  clientId: livestock-registry-dashboard
+  role: Dashboard Viewer
+
+# Seconds a validated session is trusted before IAM is asked again.
+sessionCacheSeconds: 60
+
+# Header links; empty hides them.
+links:
+  staffPortalUrl: ""
+  registryPortalUrl: ""
+
+# IAM registration hook (tile, permission, role). See templates/iam-register-job.yaml.
+iamRegister:
+  enabled: true
+  # IAM base URL for the registration API; default: iam.url.
+  iamUrl: ""
+  # Keycloak token endpoint for access.clientId (cluster-internal); default:
+  # keycloakSetup.url + /realms/<keycloakSetup.realm>/protocol/openid-connect/token
+  tokenUrl: ""
+  description: Livestock Dashboard
+  # Secret holding access.clientId's client secret. Empty name: the release
+  # generates and keeps one (<release>-client), and keycloakSetup puts the
+  # same value on the Keycloak client.
+  clientSecret:
+    name: ""
+    key: client_secret
+
+# Keycloak client + "Dashboard Viewer" role (templates/keycloak-setup-job.yaml),
+# set up through the Keycloak admin API on every install and upgrade.
+keycloakSetup:
+  enabled: true
+  # Keycloak base URL reachable from the pod, and the registry's realm.
+  url: http://commons-keycloak
+  realm: ""
+  adminUser: admin
+  adminSecret:
+    name: commons-keycloak
+    key: admin-password
+  # Existing users granted the role on every deploy.
+  grantUsers: []
+  image: quay.io/keycloak/keycloak:26.0.7
+
+# Extra environment variables, as NAME: value. Values may use templates.
+env: {}
+envFrom: []
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 768Mi
+
+service:
+  port: 80
+
+# Hostname routing through the Istio ingress gateway. TLS terminates at the
+# host's nginx, which forwards to the gateway on plain HTTP.
+ingress:
+  # Public hostname on this release's own Istio Gateway.
+  public:
+    enabled: false
+    host: ""
+    # Istio Gateway the release creates for the host; default <release>-public
+    # (an own name, so it never collides with a Gateway another release owns).
+    gatewayName: ""
+  # Private hostname on an existing gateway in this namespace (e.g. "internal"
+  # for *.<namespace>.openg2p.test).
+  private:
+    enabled: false
+    host: ""
+    gateway: internal
+
+# Selector of the Istio ingress gateway pods.
+istioIngressSelector:
+  istio: ingressgateway
