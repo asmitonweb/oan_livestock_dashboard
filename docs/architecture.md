@@ -91,12 +91,21 @@ dashboard role.
 | `GET /api/health` | liveness, and whether the chart source answers |
 | `GET /api/me` | signed-in user's name and header links |
 | `GET /api/charts?charts=a,b&<filters>` | rows for several charts |
-| `GET /api/filter-options` | regions (from the map boundaries) and record statuses |
-| `GET /api/locations?regionId=` / `zoneId=` / `woredaId=` | child units for the filter cascade |
+| `GET /api/filter-options` | regions (from the shared location catalog) and record statuses |
+| `GET /api/locations?regionId=` / `zoneId=` / `woredaId=` | child units for the filter cascade (location catalog) |
 | `GET /api/maps/<level>` | compressed boundaries for the map |
-| `GET /api/auth/login?returnTo=` / `GET /api/auth/logout` | start login / sign out (both at IAM) |
+| `GET /api/auth/login?returnTo=` / `GET /api/auth/logout` | start login at IAM / sign out (IAM, or locally when the session has expired) |
 
-Filters: `region`, `zone`, `woreda`, `kebele` (P-codes) and `recordState`.
+Filters: `region`, `zone`, `woreda`, `kebele` (catalog codes: P-codes such as `ET04`, `ET0401`) and `recordState`.
+
+The filter locations come from `data/geo-catalog.json.br`, a snapshot of the farmer
+registry's Master Data location catalog, which every registry shares
+(`scripts/build-geo-catalog.mjs`; see docs/deployment.md). The map boundaries
+are older and miss units the registries record, so they draw the map only.
+
+The dashboard serves one host, `PUBLIC_URL`: IAM's session cookies reach only
+hosts under its cookie domain, so `proxy.ts` redirects any other host there
+first (except `/api/health`, which probes call on the pod address).
 
 ## Exports
 

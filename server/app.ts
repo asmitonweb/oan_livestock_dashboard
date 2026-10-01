@@ -7,12 +7,16 @@
 //   GET /api/charts          ?charts=a,b,c&<filters>  rows for several charts
 //   GET /api/filter-options  regions + record statuses for the filter bar
 //   GET /api/locations       ?regionId= | ?zoneId= | ?woredaId=  child units
+//
+// Filter locations come from the shared location catalog (the farmer
+// registry's Master Data catalog, see server/geo-catalog.ts), not from the map
+// boundaries, which are older and miss units the registries record.
 import { Elysia } from "elysia"
 import { cookies } from "next/headers"
-import { getBoundaries } from "./boundaries"
+import { getGeoCatalog } from "./geo-catalog"
 import { checkSession } from "./auth/session"
 import { config } from "./config"
-import { CHARTS, isChartId, KEBELE_CHART, RECORD_STATE_CHART } from "./data/catalog"
+import { CHARTS, isChartId, RECORD_STATE_CHART } from "./data/catalog"
 import { cleanFilters, getChart, pingSource } from "./data"
 
 type ChartResult = { data: Record<string, unknown>[]; success: boolean; error: string | null }
@@ -75,14 +79,14 @@ export function createApp(prefix = "/api") {
     .get("/filter-options", async ({ set }) => {
       try {
         const [{ regions }, states] = await Promise.all([
-          getBoundaries(),
+          getGeoCatalog(),
           getChart(RECORD_STATE_CHART.id, {}).catch(error => {
             console.warn("[filter-options] record statuses unavailable:", error instanceof Error ? error.message : error)
             return []
           }),
         ])
         return {
-          regions: regions.map(r => ({ id: r.code, code: r.code, name: r.name })),
+          regions: regions.map(r => ({ id: r.id, code: r.id, name: r.name })),
           recordStatuses: states.map(r => ({
             status: String(r[RECORD_STATE_CHART.statusColumn]),
             count: Number(r[RECORD_STATE_CHART.countColumn]) || 0,
@@ -100,19 +104,10 @@ export function createApp(prefix = "/api") {
       const zone = pickCode(query.zoneId)
       const woreda = pickCode(query.woredaId)
       try {
-        const { zones, woredas } = await getBoundaries()
-        if (region) return { zones: zones.filter(z => z.region === region).map(z => ({ id: z.code, name: z.name })) }
-        if (zone) return { woredas: woredas.filter(w => w.zone === zone).map(w => ({ id: w.code, name: w.name })) }
-        if (woreda) {
-          // Kebeles are not in the map boundaries; list the ones with registrations.
-          const rows = await getChart(KEBELE_CHART.id, { woreda })
-          return {
-            kebeles: rows
-              .map(r => ({ id: String(r[KEBELE_CHART.codeColumn]), name: String(r[KEBELE_CHART.nameColumn]) }))
-              .filter(k => k.id && k.id !== "Unknown")
-              .sort((a, b) => a.name.localeCompare(b.name)),
-          }
-        }
+        const geo = await getGeoCatalog()
+        if (region) return { zones: geo.children("zones", region) }
+        if (zone) return { woredas: geo.children("woredas", zone) }
+        if (woreda) return { kebeles: geo.children("kebeles", woreda) }
         set.status = 400
         return { error: "One of regionId, zoneId or woredaId is required" }
       } catch (error) {
