@@ -1,6 +1,6 @@
 "use client"
 
-// Presentation primitives for the Crop Sown and Livestock registry dashboards.
+// Presentation primitives shared by the registry dashboard views.
 // These intentionally sit outside the shadcn Card/Chart stack so the registry
 // views can match the OpenG2P reference design without restyling every tab.
 
