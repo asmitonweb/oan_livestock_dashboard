@@ -2,13 +2,36 @@
 // reaches a page or an API route. No session sends a page to the registry's
 // IAM login and fails an API call with 401; a session without the dashboard
 // role gets the 403 page or a 403 response.
+//
+// IAM scopes its session cookies to the registry's cookie domain, so the
+// dashboard only sees them on its own host. A request for any other host
+// (localhost, a pod IP) is sent to PUBLIC_URL first; otherwise every visit
+// would start a fresh login that never completes.
 import { NextResponse, type NextRequest } from "next/server"
 import { checkSession } from "@/server/auth/session"
+
+function canonicalRedirect(request: NextRequest): NextResponse | null {
+  const publicUrl = process.env.PUBLIC_URL?.trim()
+  if (!publicUrl) return null
+  let canonical: URL
+  try {
+    canonical = new URL(publicUrl)
+  } catch {
+    return null
+  }
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host")
+  if (!host || host.toLowerCase() === canonical.host.toLowerCase()) return null
+  const { pathname, search } = request.nextUrl
+  return NextResponse.redirect(new URL(`${pathname}${search}`, canonical), 308)
+}
 
 const PUBLIC_PATHS = ["/api/health", "/api/auth/login", "/api/auth/logout", "/forbidden"]
 
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl
+  if (pathname === "/api/health") return NextResponse.next() // probes hit the pod address
+  const redirect = canonicalRedirect(request)
+  if (redirect) return redirect
   if (PUBLIC_PATHS.some(path => pathname === path)) return NextResponse.next()
 
   const isApi = pathname.startsWith("/api/")

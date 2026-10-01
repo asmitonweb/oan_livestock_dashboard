@@ -46,6 +46,14 @@ export const config = {
     clientId: optional("DASHBOARD_CLIENT_ID", "livestock-registry-dashboard"),
     /** Client role that grants access to this dashboard. */
     role: optional("DASHBOARD_ROLE", "Dashboard Viewer"),
+    /** Domain IAM scopes its session cookies to; logout clears them there. */
+    cookieDomain: optional("COOKIE_DOMAIN", ""),
+    /**
+     * Keycloak's end-session endpoint and IAM's client id. Used to end the
+     * Keycloak session when IAM cannot (expired session); empty skips it.
+     */
+    oidcLogoutUrl: optional("OIDC_LOGOUT_URL", ""),
+    oidcClientId: optional("OIDC_CLIENT_ID", ""),
     /** How long a validated session is trusted before IAM is asked again. */
     sessionTtlMs: Math.max(5, Number(process.env.SESSION_CACHE_SECONDS) || 60) * 1000,
   },
