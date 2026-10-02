@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [develop, staging, main]
+    branches: [develop, main]   # staging: not wired yet
 
 permissions:
   contents: read
@@ -27,12 +27,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
-      - name: Lint and render the chart (dev values)
+      - name: Lint and render the chart
+        # No cluster here, so the IAM cookie domain lookup is given explicitly.
         run: |
           chart=$(ls -d helm/*/ | head -1)
-          args="--set image.repository=123456789012.dkr.ecr.ap-south-1.amazonaws.com/ci --set image.tag=ci"
-          helm lint "$chart" -f "$chart/values-dev.yaml" $args
-          helm template ci "$chart" -f "$chart/values-dev.yaml" $args > /dev/null
+          args="--set image.repository=123456789012.dkr.ecr.ap-south-1.amazonaws.com/ci --set image.tag=ci --set environment=development --set iam.cookieDomain=.example.org"
+          helm lint "$chart" $args
+          helm template ci "$chart" $args > /dev/null
 
   image:
     runs-on: ubuntu-latest

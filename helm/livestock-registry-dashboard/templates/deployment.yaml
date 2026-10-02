@@ -35,23 +35,17 @@ spec:
             - name: CHART_SOURCE
               value: http
             - name: DASHBOARD_API_URL
-              value: {{ required "dashboardApiUrl is required" .Values.dashboardApiUrl | quote }}
+              value: {{ printf "http://%s" .Values.dashboardApi.service | quote }}
             - name: DASHBOARD_CACHE_TTL_SECONDS
               value: {{ .Values.cacheTtlSeconds | quote }}
-            - name: LOGIN_PROVIDER_ID
-              value: {{ .Values.iam.loginProviderId | quote }}
-            - name: COOKIE_DOMAIN
-              value: {{ .Values.iam.cookieDomain | quote }}
+            - name: SESSION_CACHE_SECONDS
+              value: {{ .Values.sessionCacheSeconds | quote }}
             - name: OIDC_LOGOUT_URL
               value: {{ .Values.oidc.logoutUrl | quote }}
             - name: OIDC_CLIENT_ID
               value: {{ .Values.oidc.clientId | quote }}
-            - name: DASHBOARD_ROLE
-              value: {{ .Values.access.role | quote }}
-            - name: SESSION_CACHE_SECONDS
-              value: {{ .Values.sessionCacheSeconds | quote }}
             - name: STAFF_PORTAL_URL
-              value: {{ .Values.links.staffPortalUrl | quote }}
+              value: {{ include "dashboard.staffPortalUrl" . | quote }}
             - name: REGISTRY_PORTAL_URL
               value: {{ .Values.links.registryPortalUrl | quote }}
             {{- range $name, $value := .Values.env }}

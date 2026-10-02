@@ -110,26 +110,86 @@ imagePullSecrets:
 {{- end }}
 {{- end -}}
 
-{{/* Settings shared by the server and the IAM registration job. */}}
+{{/*
+Cookie domain of the registry's IAM: iam.cookieDomain when set, otherwise read
+from the IAM Deployment at install time (its IAM_STAFF_AUTH_COOKIE_DOMAIN).
+The dashboard must be served under it, or the browser never sends it IAM's
+session cookies. Lookups need a cluster: `helm template` cannot resolve it,
+`helm upgrade --dry-run=server` can.
+*/}}
+{{- define "dashboard.cookieDomain" -}}
+{{- if .Values.iam.cookieDomain -}}
+{{- .Values.iam.cookieDomain -}}
+{{- else -}}
+{{- $found := "" -}}
+{{- $deploy := lookup "apps/v1" "Deployment" .Release.Namespace .Values.iam.service -}}
+{{- if $deploy -}}
+{{- range $c := $deploy.spec.template.spec.containers -}}
+{{- range $e := ($c.env | default list) -}}
+{{- if and (eq $e.name "IAM_STAFF_AUTH_COOKIE_DOMAIN") $e.value -}}
+{{- $found = $e.value -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- required (printf "could not read IAM_STAFF_AUTH_COOKIE_DOMAIN from Deployment %s/%s; set iam.cookieDomain" .Release.Namespace .Values.iam.service) $found -}}
+{{- end -}}
+{{- end -}}
+
+{{/* Base domain: domain when set, else the IAM cookie domain without its leading dot. */}}
+{{- define "dashboard.domain" -}}
+{{- .Values.domain | default (trimPrefix "." (include "dashboard.cookieDomain" .)) -}}
+{{- end -}}
+
+{{/* <name>[-<environment>].<domain>: the naming every public host of the environment follows. */}}
+{{- define "dashboard.hostFor" -}}
+{{- $root := .root -}}
+{{- if $root.Values.environment -}}
+{{- printf "%s-%s.%s" .name $root.Values.environment (include "dashboard.domain" $root) -}}
+{{- else -}}
+{{- printf "%s.%s" .name (include "dashboard.domain" $root) -}}
+{{- end -}}
+{{- end -}}
+
+{{/* The dashboard's public host: host when set, else <release>[-<environment>].<domain>. */}}
+{{- define "dashboard.host" -}}
+{{- .Values.host | default (include "dashboard.hostFor" (dict "root" . "name" .Release.Name)) -}}
+{{- end -}}
+
+{{- define "dashboard.publicUrl" -}}
+https://{{ include "dashboard.host" . }}
+{{- end -}}
+
+{{/* The registry's staff portal: links.staffPortalUrl, else staff-portal-<registry>[-<environment>].<domain>. */}}
+{{- define "dashboard.staffPortalUrl" -}}
+{{- if .Values.links.staffPortalUrl -}}
+{{- .Values.links.staffPortalUrl -}}
+{{- else if .Values.registry -}}
+https://{{ include "dashboard.hostFor" (dict "root" . "name" (printf "staff-portal-%s" .Values.registry)) }}
+{{- end -}}
+{{- end -}}
+
+{{- define "dashboard.iamUrl" -}}
+http://{{ .Values.iam.service }}
+{{- end -}}
+
+{{/* Settings shared by the server and the IAM setup job. */}}
 {{- define "dashboard.appEnv" -}}
 - name: PUBLIC_URL
-  value: {{ required "publicUrl is required" .Values.publicUrl | quote }}
+  value: {{ include "dashboard.publicUrl" . | quote }}
 - name: IAM_URL
-  value: {{ required "iam.url is required" .Values.iam.url | quote }}
+  value: {{ include "dashboard.iamUrl" . | quote }}
+- name: COOKIE_DOMAIN
+  value: {{ include "dashboard.cookieDomain" . | quote }}
+- name: LOGIN_PROVIDER_ID
+  value: {{ .Values.iam.loginProviderId | quote }}
 - name: DASHBOARD_CLIENT_ID
   value: {{ .Values.access.clientId | quote }}
+- name: DASHBOARD_ROLE
+  value: {{ .Values.access.role | quote }}
 {{- end -}}
 
-{{/* Secret holding the Keycloak client secret: iamRegister.clientSecret.name, else the release's own. */}}
+{{/* Secret holding the Keycloak client secret: iamSetup.clientSecret.name, else the release's own. */}}
 {{- define "dashboard.clientSecretName" -}}
-{{- .Values.iamRegister.clientSecret.name | default (printf "%s-client" (include "dashboard.fullname" .)) -}}
-{{- end -}}
-
-{{/* Token endpoint the IAM registration logs in at: iamRegister.tokenUrl, else keycloakSetup.url + realm. */}}
-{{- define "dashboard.tokenUrl" -}}
-{{- if .Values.iamRegister.tokenUrl -}}
-{{- .Values.iamRegister.tokenUrl -}}
-{{- else -}}
-{{- printf "%s/realms/%s/protocol/openid-connect/token" (trimSuffix "/" (required "iamRegister.tokenUrl or keycloakSetup.url is required" .Values.keycloakSetup.url)) (required "keycloakSetup.realm is required" .Values.keycloakSetup.realm) -}}
-{{- end -}}
+{{- .Values.iamSetup.clientSecret.name | default (printf "%s-client" (include "dashboard.fullname" .)) -}}
 {{- end -}}

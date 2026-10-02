@@ -4,7 +4,7 @@ TLS and forwards to the gateway (port 8080, HTTP2), which matches on Host.
 */}}
 {{- with .Values.ingress.public }}
 {{- if .enabled }}
-{{- $host := required "ingress.public.host is required when it is enabled" .host }}
+{{- $host := .host | default (include "dashboard.host" $) }}
 {{- $gateway := .gatewayName | default (printf "%s-public" (include "dashboard.fullname" $)) }}
 ---
 apiVersion: networking.istio.io/v1
