@@ -27,9 +27,10 @@ export async function GET(request: NextRequest) {
       })
       const location = res.headers.get("location")
       if (res.status >= 300 && res.status < 400 && location) {
-        const response = NextResponse.redirect(location)
-        for (const setCookie of res.headers.getSetCookie()) response.headers.append("Set-Cookie", setCookie)
-        return response
+        // IAM's own cookie clearing uses its cookie domain, which can differ
+        // from the one this dashboard is served under (an IAM may serve
+        // several domains), so the cookies are always cleared here as well.
+        return clearSession(NextResponse.redirect(location))
       }
     } catch (error) {
       console.warn("[auth] IAM logout failed, clearing the session here:", error instanceof Error ? error.message : error)
@@ -45,7 +46,10 @@ export async function GET(request: NextRequest) {
     if (idToken) params.set("id_token_hint", idToken)
     target = `${config.auth.oidcLogoutUrl}?${params}`
   }
-  const response = NextResponse.redirect(target)
+  return clearSession(NextResponse.redirect(target))
+}
+
+function clearSession(response: NextResponse): NextResponse {
   for (const name of SESSION_COOKIES) {
     response.cookies.set(name, "", {
       maxAge: 0,

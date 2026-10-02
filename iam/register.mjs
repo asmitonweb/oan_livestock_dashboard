@@ -5,12 +5,15 @@
 //
 // IAM shows the tile enabled only to users whose token carries a client role
 // on the Keycloak client named like the application mnemonic, so that client
-// and its "Dashboard Viewer" role must already exist (environment setup).
+// and its "Dashboard Viewer" role must already exist (iam/keycloak-setup.mjs).
 // Authenticates as that client with client_credentials (its service account).
+// IAM accepts the token only from an issuer one of its login providers names,
+// so by default the token endpoint is discovered from IAM (discover.mjs).
 //
 // Environment:
-//   IAM_REGISTER_URL  IAM base URL reachable from the job (e.g. http://iam:8000)
-//   TOKEN_URL         Keycloak token endpoint of the registry's realm
+//   IAM_REGISTER_URL  IAM base URL reachable from the job (default IAM_URL)
+//   TOKEN_URL         Keycloak token endpoint; default: discovered from IAM
+//                     (with PUBLIC_URL, COOKIE_DOMAIN, LOGIN_PROVIDER_ID)
 //   DASHBOARD_CLIENT_ID, DASHBOARD_CLIENT_SECRET  that client
 //   PUBLIC_URL        browser URL of the dashboard (the tile link)
 //   APP_DESCRIPTION   tile label
@@ -18,14 +21,14 @@
 import { readFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { discoverSignIn } from "./discover.mjs"
 
 const env = name => {
   const value = process.env[name]?.trim()
   if (!value) throw new Error(`${name} is not set`)
   return value
 }
-const iamUrl = env("IAM_REGISTER_URL").replace(/\/+$/, "")
-const tokenUrl = env("TOKEN_URL")
+const iamUrl = (process.env.IAM_REGISTER_URL?.trim() || env("IAM_URL")).replace(/\/+$/, "")
 const clientId = env("DASHBOARD_CLIENT_ID")
 const clientSecret = env("DASHBOARD_CLIENT_SECRET")
 const appUrl = env("PUBLIC_URL").replace(/\/+$/, "")
@@ -59,7 +62,19 @@ await retry("IAM ping", async () => {
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
 })
 
-console.log(`Requesting a token for ${clientId}...`)
+const tokenUrl =
+  process.env.TOKEN_URL?.trim() ||
+  (await retry("Keycloak discovery", async () => {
+    const found = await discoverSignIn({
+      iamUrl,
+      providerId: process.env.LOGIN_PROVIDER_ID?.trim(),
+      cookieDomain: process.env.COOKIE_DOMAIN?.trim(),
+      publicUrl: appUrl,
+    })
+    return `${found.realmUrl}/protocol/openid-connect/token`
+  }))
+
+console.log(`Requesting a token for ${clientId} at ${tokenUrl}...`)
 const token = await retry("token", async () => {
   const res = await fetch(tokenUrl, {
     method: "POST",

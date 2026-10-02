@@ -41,7 +41,8 @@ export const config = {
     get iamUrl() {
       return trimSlash(required("IAM_URL"))
     },
-    loginProviderId: optional("LOGIN_PROVIDER_ID", "1"),
+    /** IAM login provider; empty: discovered (server/auth/login-provider.ts). */
+    loginProviderId: optional("LOGIN_PROVIDER_ID", ""),
     /** Keycloak client (= IAM application mnemonic) holding the access role. */
     clientId: optional("DASHBOARD_CLIENT_ID", "livestock-registry-dashboard"),
     /** Client role that grants access to this dashboard. */
