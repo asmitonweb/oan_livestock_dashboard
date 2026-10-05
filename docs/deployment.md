@@ -82,7 +82,7 @@ node scripts/build-geo-catalog.mjs ../farmer-registry/docker/db-seed/seed-data/g
 `Jenkinsfile` runs as a multibranch job.
 
 **Every branch**
-- **Verify:** lint and type-check in a Node 20 container.
+- **Verify:** lint and type-check in a Node 24 container.
 
 **`develop` only**
 1. **ECR Login:** creates the ECR repository

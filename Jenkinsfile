@@ -46,7 +46,7 @@ pipeline {
             // build type-checks again and compiles.
             steps {
                 sh '''
-                    docker run --rm -v "$PWD:/src:ro" node:20-slim sh -ec '
+                    docker run --rm -v "$PWD:/src:ro" node:24-slim sh -ec '
                         cp -r /src /work && cd /work
                         npm ci --no-audit --no-fund
                         npm run lint

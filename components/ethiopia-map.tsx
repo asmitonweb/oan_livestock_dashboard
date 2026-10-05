@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, Home, MapPin, X, List, Download, Camera, Eye, Maximize2 } from "lucide-react"
+import { ChevronLeft, MapPin, X, List, Download, Camera, Eye, Maximize2 } from "lucide-react"
 import { toPng } from "html-to-image"
 import {
   Dialog,

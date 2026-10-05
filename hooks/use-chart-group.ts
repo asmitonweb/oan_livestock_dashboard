@@ -41,7 +41,10 @@ export function useChartGroupData(chartNames: string[], filters: Record<string, 
     fetch(`/api/charts?${params.toString()}`)
       .then(async response => {
         if (response.status === 401) {
-          // Session ended while the page was open: go through login again.
+          // Session ended while the page was open: go through login again. A full
+          // navigation on purpose: /api/auth/login is a route handler that
+          // redirects to IAM, not a page the router could render.
+          // eslint-disable-next-line @next/next/no-location-assign-relative-destination
           window.location.href = `/api/auth/login?returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`
           return
         }
