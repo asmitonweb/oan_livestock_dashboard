@@ -2,6 +2,8 @@
 After every install and upgrade, from the dashboard image:
   1. iam/keycloak-setup.mjs: the Keycloak client access.clientId, its role
      access.role, and the role for iamSetup.grantUsers (admin REST API);
+     With dashboardApi.auth.enabled, also the dashboard-api's client and role,
+     granted to this client's service account;
   2. iam/register.mjs: the staff-portal tile, dashboard:view permission and
      role in the registry's IAM (iam/payload.json).
 Both are idempotent. The Keycloak host and realm are not configured: they are
@@ -59,6 +61,12 @@ spec:
               value: {{ join " " .Values.iamSetup.grantUsers | quote }}
             - name: APP_DESCRIPTION
               value: {{ .Values.iamSetup.description | quote }}
+            {{- if .Values.dashboardApi.auth.enabled }}
+            - name: DASHBOARD_API_CLIENT_ID
+              value: {{ .Values.dashboardApi.auth.clientId | quote }}
+            - name: DASHBOARD_API_ROLE
+              value: {{ .Values.dashboardApi.auth.role | quote }}
+            {{- end }}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

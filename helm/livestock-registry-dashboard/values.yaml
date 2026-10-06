@@ -43,10 +43,29 @@ imagePullSecrets: []
 
 replicas: 1
 
-# The registry's dashboard-api Service (cluster-internal); the only part that
-# reads the registry database.
+# The registry's dashboard-api: the only part that reads the registry database.
 dashboardApi:
+  # Its Service in this namespace.
   service: livestock-registry-dashboard-api
+  # Full base URL instead, when it runs elsewhere: another namespace
+  # (http://<service>.<namespace>) or another cluster or server, over a private
+  # route only (https://...). Never a public one.
+  url: ""
+  # Service-to-service authentication. On: every chart request carries a
+  # client-credentials token of this dashboard's Keycloak client
+  # (access.clientId), and the IAM setup job creates the dashboard-api's client
+  # and role below and grants the role to this dashboard's service account.
+  # Turn on together with the dashboard-api's own authentication
+  # (AUTH_IAM_URL); required once it is reached from outside its cluster. The
+  # development pipeline turns it on.
+  auth:
+    enabled: false
+    # The dashboard-api's AUTH_AUDIENCE and AUTH_ROLE.
+    clientId: livestock-registry-dashboard-api
+    role: charts:read
+    # Keycloak token endpoint. Empty: that of the realm IAM signs staff in
+    # with (discovered), which the dashboard-api trusts through the same IAM.
+    tokenUrl: ""
 
 # Seconds chart rows are served before a background refresh (min 60).
 cacheTtlSeconds: 900
@@ -56,6 +75,9 @@ iam:
   # (-pub) scopes its session cookies to the public domain; only the dashboard
   # server calls it, through the Service.
   service: commons-services-iam-staff-portal-api-pub
+  # Base URL instead of the Service, when IAM runs in another cluster or on
+  # another server. Set cookieDomain too: it cannot be read from there.
+  url: ""
   # Default: read from that Deployment (IAM_STAFF_AUTH_COOKIE_DOMAIN).
   cookieDomain: ""
   # Default: discovered (the provider whose IAM callback lies under the

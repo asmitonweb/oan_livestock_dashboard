@@ -122,6 +122,7 @@ pipeline {
                         ARGS="--namespace ${HELM_NAMESPACE} \
                             --set environment=${DEV_ENVIRONMENT} \
                             --set iam.service=${IAM_DEPLOYMENT} --set iam.cookieDomain=\$COOKIE_DOMAIN \
+                            --set dashboardApi.auth.enabled=true \
                             --set image.repository=${ECR_REGISTRY}/${ECR_REPOSITORY} \
                             --set image.tag=${env.IMAGE_TAG}"
                         # Render first, so a broken chart or value fails before any change.

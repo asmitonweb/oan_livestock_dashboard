@@ -5,6 +5,7 @@
 // in between, and while a refresh is in flight or failing, the last good rows
 // are served (stale-while-revalidate).
 import { LRUCache } from "lru-cache"
+import { dashboardApiTokens } from "../auth/service-token"
 import { config } from "../config"
 import { CHARTS, FILTER_NAMES, type ChartFilters, type ChartId, type Rows } from "./catalog"
 import type { ChartSource } from "./chart-source"
@@ -13,7 +14,7 @@ import { HttpChartSource } from "./http-chart-source"
 function createSource(): ChartSource {
   switch (config.chartSource) {
     case "http":
-      return new HttpChartSource(config.dashboardApiUrl)
+      return new HttpChartSource(config.dashboardApiUrl, dashboardApiTokens())
     // case "sql": a source that queries the reporting views directly, once the
     // dashboard-api is folded into this service.
     default:

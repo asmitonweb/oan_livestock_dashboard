@@ -34,6 +34,22 @@ export const config = {
   /** How long chart rows are served before a background refresh (min 60 s). */
   cacheTtlMs: Math.max(60, Number(process.env.DASHBOARD_CACHE_TTL_SECONDS) || 900) * 1000,
 
+  /** How this server proves itself to the dashboard-api (server/auth/service-token.ts). */
+  dashboardApiAuth: {
+    /**
+     * `none`: no credentials; the network alone keeps other callers out.
+     * `client-credentials`: a Keycloak token of this dashboard's own client
+     * (auth.clientId) on every chart request.
+     */
+    mode: optional("DASHBOARD_API_AUTH", "none"),
+    /** Keycloak token endpoint; empty: that of the realm IAM signs staff in with. */
+    tokenUrl: optional("OIDC_TOKEN_URL", ""),
+    /** Secret of auth.clientId (the same client that registers the dashboard with IAM). */
+    get clientSecret() {
+      return required("DASHBOARD_CLIENT_SECRET")
+    },
+  },
+
   auth: {
     /** Off only for local UI work; every route is open when false. */
     enabled: flag("AUTH_ENABLED", true),

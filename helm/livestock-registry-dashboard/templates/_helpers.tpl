@@ -169,8 +169,14 @@ https://{{ include "dashboard.hostFor" (dict "root" . "name" (printf "staff-port
 {{- end -}}
 {{- end -}}
 
+{{/* The dashboard-api: dashboardApi.url, else its Service in this namespace. */}}
+{{- define "dashboard.dashboardApiUrl" -}}
+{{- .Values.dashboardApi.url | default (printf "http://%s" .Values.dashboardApi.service) | trimSuffix "/" -}}
+{{- end -}}
+
+{{/* The registry's IAM as the server calls it: iam.url, else its Service (iam.service). */}}
 {{- define "dashboard.iamUrl" -}}
-http://{{ .Values.iam.service }}
+{{- .Values.iam.url | default (printf "http://%s" .Values.iam.service) | trimSuffix "/" -}}
 {{- end -}}
 
 {{/* Settings shared by the server and the IAM setup job. */}}

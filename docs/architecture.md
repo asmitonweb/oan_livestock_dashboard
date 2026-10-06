@@ -9,8 +9,9 @@ It shows aggregate figures only and never handles individual records.
                                              ├─ proxy.ts      session + role check (every request)
                                              ├─ /api/*        Elysia BFF: charts, filters, user
                                              └─ ChartSource   ─► livestock-registry-dashboard-api ─► reporting views
-                                                  │
+                                                  │                  (bearer token, optional)
  registry IAM ◄── session check (get_user_profile)┘
+ Keycloak     ◄── client-credentials token for the dashboard-api (optional)
 ```
 
 ## Access
@@ -66,6 +67,40 @@ Responses are cached in process for `DASHBOARD_CACHE_TTL_SECONDS` (default
 last good rows are served if it fails. The cache is warmed at startup
 (`instrumentation.ts`).
 
+### Authentication towards the dashboard-api
+
+The dashboard-api is called by this server only, never by a browser, and as
+this service rather than as a user: rows are shared across users and refreshed
+in the background. Two modes (`DASHBOARD_API_AUTH`):
+
+| Mode | Use when | What is sent |
+| --- | --- | --- |
+| `none` (default) | The dashboard-api is reachable only on the private network both run in (same cluster) | Nothing; the network keeps other callers out |
+| `client-credentials` | Always recommended; required when the dashboard runs in another cluster or on another server | `Authorization: Bearer <token>` on every chart request |
+
+With `client-credentials`, `server/auth/service-token.ts` gets a token from
+Keycloak with the client-credentials grant for this dashboard's own client
+(`DASHBOARD_CLIENT_ID` / `DASHBOARD_CLIENT_SECRET`, the client whose service
+account also registers with IAM). The token is reused until 30 s before it
+expires, concurrent refreshes share one request, and a `401` from the
+dashboard-api drops it and retries once.
+
+The dashboard-api accepts the token when it carries its client role (default
+`charts:read` on the client `livestock-registry-dashboard-api`) and was issued by
+an issuer it trusts. The IAM setup job creates that client and role and grants
+the role to this dashboard's service account (`iam/keycloak-setup.mjs`), so
+Keycloak adds both the audience and the role to the token by itself.
+
+The token endpoint is `OIDC_TOKEN_URL`, or that of the realm IAM signs staff in
+with, discovered once like the login provider. The dashboard-api, given the
+same IAM (`AUTH_IAM_URL`), trusts every realm IAM's login providers sign staff
+in with, so neither side configures a realm URL. Keycloak writes the URL a
+token was requested at into its `iss`, so with an explicit `OIDC_TOKEN_URL` the
+dashboard-api must trust that realm URL, host and port included.
+
+`/health` of the dashboard-api needs no token, so `/api/health` here works the
+same in both modes.
+
 ### Folding the dashboard-api into this service
 
 The dashboard-api exists so that only it holds registry database credentials.
@@ -76,7 +111,8 @@ views itself:
    dashboard-api's queries (they read only the `lr_rpt_*` reporting views);
 2. select it in `server/data/index.ts` with `CHART_SOURCE=sql`, plus a
    read-only database role for this service;
-3. retire the dashboard-api deployment.
+3. retire the dashboard-api deployment, and with it the client-credentials
+   setup above.
 
 Nothing above `ChartSource` changes: the UI, the BFF routes and the cache are
 unaffected.

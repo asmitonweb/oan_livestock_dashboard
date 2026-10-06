@@ -35,7 +35,18 @@ spec:
             - name: CHART_SOURCE
               value: http
             - name: DASHBOARD_API_URL
-              value: {{ printf "http://%s" .Values.dashboardApi.service | quote }}
+              value: {{ include "dashboard.dashboardApiUrl" . | quote }}
+            {{- if .Values.dashboardApi.auth.enabled }}
+            - name: DASHBOARD_API_AUTH
+              value: client-credentials
+            - name: OIDC_TOKEN_URL
+              value: {{ .Values.dashboardApi.auth.tokenUrl | quote }}
+            - name: DASHBOARD_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "dashboard.clientSecretName" . }}
+                  key: {{ .Values.iamSetup.clientSecret.key }}
+            {{- end }}
             - name: DASHBOARD_CACHE_TTL_SECONDS
               value: {{ .Values.cacheTtlSeconds | quote }}
             - name: SESSION_CACHE_SECONDS
